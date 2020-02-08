@@ -32,6 +32,10 @@ const (
 	TraceLevel Level = -1
 )
 
+func (l Level) String() string {
+	return zerolog.Level(l).String()
+}
+
 func SetLevel(l Level) {
 	zerolog.SetGlobalLevel(zerolog.Level(l))
 }
@@ -44,22 +48,23 @@ func ParseLevel(s string) (Level, error) {
 var fileHook = lumberjack.Logger{
 	Filename:   "",
 	MaxSize:    128, // 每个日志文件保存的最大尺寸 单位：M
-	MaxBackups: 30,  // 日志文件最多保存多少个备份
-	MaxAge:     21,  // 文件最多保存多少天
+	MaxBackups: 10,  // 日志文件最多保存多少个备份
+	MaxAge:     60,  // 文件最多保存多少天
 	LocalTime:  true,
 	Compress:   true, // 是否压缩
 }
 
 // Logger just for dev env, low performance but human-friendly
-var logger *zerolog.Logger
+var logger zerolog.Logger
+var WithDeepCaller zerolog.Logger
 
 func init() {
-	l := ConsoleLogger().With().Timestamp().CallerWithSkipFrameCount(3).Logger()
-	SetLogger(&l)
+	SetLogger(ConsoleLogger())
 }
 
 func SetLogger(l *zerolog.Logger) {
-	logger = l
+	logger = l.With().Timestamp().CallerWithSkipFrameCount(2).Logger()
+	WithDeepCaller = l.With().Timestamp().CallerWithSkipFrameCount(3).Logger()
 }
 
 // FileLogger for product, height performance
@@ -74,10 +79,10 @@ func ConsoleLogger() *zerolog.Logger {
 	return &l
 }
 
-func NormalError(errs ...error) {
+func HandlerErrs(errs ...error) {
 	for _, e := range errs {
 		if e != nil {
-			logger.Error().Msg(e.Error())
+			WithDeepCaller.Error().Msg(e.Error())
 		}
 	}
 }
