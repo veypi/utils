@@ -82,7 +82,7 @@ func ConsoleLogger() *zerolog.Logger {
 func HandlerErrs(errs ...error) {
 	for _, e := range errs {
 		if e != nil {
-			WithDeepCaller.Error().Msg(e.Error())
+			WithDeepCaller.Warn().Msg(e.Error())
 		}
 	}
 }
