@@ -45,6 +45,15 @@ func ParseLevel(s string) (Level, error) {
 	return Level(l), e
 }
 
+var (
+	enableCaller bool = true
+)
+
+func DisableCaller() {
+	enableCaller = false
+	SetLogger(originLoger)
+}
+
 var fileHook = lumberjack.Logger{
 	Filename:   "",
 	MaxSize:    128, // 每个日志文件保存的最大尺寸 单位：M
@@ -55,6 +64,7 @@ var fileHook = lumberjack.Logger{
 }
 
 // Logger just for dev env, low performance but human-friendly
+var originLoger *zerolog.Logger
 var logger zerolog.Logger
 var WithDeepCaller zerolog.Logger
 
@@ -63,8 +73,14 @@ func init() {
 }
 
 func SetLogger(l *zerolog.Logger) {
-	logger = l.With().Timestamp().CallerWithSkipFrameCount(2).Logger()
-	WithDeepCaller = l.With().Timestamp().CallerWithSkipFrameCount(3).Logger()
+	originLoger = l
+	if enableCaller {
+		logger = l.With().Timestamp().CallerWithSkipFrameCount(2).Logger()
+		WithDeepCaller = l.With().Timestamp().CallerWithSkipFrameCount(3).Logger()
+	} else {
+		logger = l.With().Timestamp().Logger()
+		WithDeepCaller = l.With().Timestamp().Logger()
+	}
 }
 
 // FileLogger for product, height performance
