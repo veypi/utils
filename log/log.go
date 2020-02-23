@@ -3,9 +3,11 @@ package log
 // 封装自 zero log
 
 import (
+	"fmt"
 	"github.com/rs/zerolog"
 	"gopkg.in/natefinch/lumberjack.v2"
-	"os"
+	"runtime"
+	"strconv"
 )
 
 type Level int8
@@ -67,8 +69,12 @@ var fileHook = lumberjack.Logger{
 var originLoger *zerolog.Logger
 var logger zerolog.Logger
 var WithDeepCaller zerolog.Logger
+var WithNoCaller zerolog.Logger
 
 func init() {
+	zerolog.ErrorStackMarshaler = func(err error) interface{} {
+		return string(PanicTrace())
+	}
 	SetLogger(ConsoleLogger())
 }
 
@@ -81,6 +87,7 @@ func SetLogger(l *zerolog.Logger) {
 		logger = l.With().Timestamp().Logger()
 		WithDeepCaller = l.With().Timestamp().Logger()
 	}
+	WithNoCaller = l.With().Timestamp().Logger()
 }
 
 // FileLogger for product, height performance
@@ -91,7 +98,20 @@ func FileLogger(fileName string) *zerolog.Logger {
 }
 
 func ConsoleLogger() *zerolog.Logger {
-	l := zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout})
+	l := zerolog.New(zerolog.NewConsoleWriter(func(w *zerolog.ConsoleWriter) {
+		w.FormatFieldValue = func(i interface{}) string {
+			switch i := i.(type) {
+			case string:
+				s, e := strconv.Unquote(i)
+				if e != nil {
+					return i
+				}
+				return s
+			default:
+				return fmt.Sprintf("%s", i)
+			}
+		}
+	}))
 	return &l
 }
 
@@ -135,7 +155,7 @@ func Warn() *zerolog.Event {
 //
 // You must call Msg on the returned event in order to send the event.
 func Error() *zerolog.Event {
-	return logger.Error()
+	return logger.Error().Stack()
 }
 
 // Fatal starts a new message with fatal level. The os.Exit(1) function
@@ -143,7 +163,7 @@ func Error() *zerolog.Event {
 //
 // You must call Msg on the returned event in order to send the event.
 func Fatal() *zerolog.Event {
-	return logger.Fatal()
+	return logger.Fatal().Stack()
 }
 
 // Panic starts a new message with panic level. The message is also sent
@@ -172,4 +192,21 @@ func Print(v ...interface{}) {
 // Arguments are handled in the manner of fmt.Printf.
 func Printf(format string, v ...interface{}) {
 	logger.Printf(format, v...)
+}
+
+func PanicTrace() []byte {
+	buf := make([]byte, 10240)
+	n := runtime.Stack(buf, false)
+	if n > 0 {
+		count := 0
+		for i, v := range buf[:n] {
+			if v == '\n' {
+				count++
+				if count == 11 {
+					return buf[i:n]
+				}
+			}
+		}
+	}
+	return buf[:n]
 }

@@ -8,12 +8,14 @@ package utils
 //
 
 import (
+	"fmt"
 	"testing"
 )
 
 func TestAes(t *testing.T) {
 	text := RandSeq(32)
-	key := []byte(RandSeq(35))
+	fmt.Println(len(text))
+	key := []byte("123456")
 	xText, err := AesEncrypt(text, key)
 	if err != nil {
 		t.Errorf(err.Error())
