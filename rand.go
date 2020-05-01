@@ -10,17 +10,24 @@ package utils
 import (
 	"math/rand"
 	"time"
+	"unsafe"
 )
 
 var letters = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890")
-var size = len(letters)
+var size = int32(len(letters))
+var seed = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 // RandSeq produce random string seq
 func RandSeq(n int) string {
 	b := make([]byte, n)
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	for i := range b {
-		b[i] = letters[r.Intn(size)]
+		b[i] = letters[seed.Int31n(size)]
 	}
-	return string(b)
+	return *(*string)(unsafe.Pointer(&b))
+}
+
+func Rand(n int) []byte {
+	b := make([]byte, n)
+	seed.Read(b)
+	return b
 }
