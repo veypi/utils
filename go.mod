@@ -1,4 +1,4 @@
-module github.com/lightjiang/utils
+module github.com/veypi/utils
 
 go 1.13
 
