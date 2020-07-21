@@ -72,6 +72,7 @@ var WithDeepCaller zerolog.Logger
 var WithNoCaller zerolog.Logger
 
 func init() {
+	// 输出trace信息，err以上级别调用Err或者Errs使触发
 	zerolog.ErrorStackMarshaler = func(err error) interface{} {
 		return string(PanicTrace())
 	}
