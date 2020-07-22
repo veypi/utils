@@ -8,14 +8,23 @@ import (
 	"github.com/veypi/utils/log"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 var (
 	UnSupportWin = errors.New("un support on windows")
 )
+
+type Service interface {
+	// 设置最多重试次数
+	SetExecMax(uint)
+	// 设置服务停止触发函数
+	SetStopFunc(func())
+}
 
 func NewCli(app *cli.App, cfgArgs ...interface{}) error {
 	if app == nil || app.Name == "" {
@@ -73,19 +82,17 @@ func NewCli(app *cli.App, cfgArgs ...interface{}) error {
 }
 
 // 与 urfave/cli 配合使用
-// startFunc 是 服务的启动程序，不要阻塞住，会注册到app.Action上
-// stopFunc 是 服务的停止接口
+// runnerFunc 是 服务的阻塞启动程序，函数如果执行完会自动重新执行, 间隔时间1ms开始指数增长
 // cfgArgs 是参数的相关配置， 第一项是cfg，是个可以序列化的对象， 第二项是cfgFilePath, 字符串
 // cfg 是 参数对象， cfgFilePath 是参数文件地址， install 时 创建该文件，并填入cfg中数据, cfg 为空则不创建， cfgFilePath 为空则在默认位置创建
 // 默认位置 `C:\Program Files\name\name.yml` 或者 /etc/name/name.yaml
-func NewSrv(app *cli.App, startFunc cli.ActionFunc, stopFunc cli.ActionFunc, cfgArgs ...interface{}) error {
+func NewSrv(app *cli.App, runnerFunc cli.ActionFunc, cfgArgs ...interface{}) (Service, error) {
 	if app == nil || app.Name == "" {
 		panic("invalid app")
 	}
 	sc := &srvCommand{
-		name:      app.Name,
-		startFunc: startFunc,
-		stopFunc:  stopFunc,
+		name:       app.Name,
+		runnerFunc: runnerFunc,
 	}
 	if len(cfgArgs) > 0 {
 		sc.cfg = cfgArgs[0]
@@ -96,7 +103,7 @@ func NewSrv(app *cli.App, startFunc cli.ActionFunc, stopFunc cli.ActionFunc, cfg
 	svcConfig := &service.Config{Name: sc.name}
 	srv, err := service.New(sc, svcConfig)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	sc.srv = srv
 	sc.init()
@@ -112,15 +119,7 @@ func NewSrv(app *cli.App, startFunc cli.ActionFunc, stopFunc cli.ActionFunc, cfg
 	app.CommandNotFound = func(c *cli.Context, s string) {
 		log.Warn().Msgf("%s command not found", s)
 	}
-	return nil
-}
-
-// 这个被service 包的Run调用, 是服务开始执行的地方
-func (sc *srvCommand) Start(service.Service) error {
-	return sc.startFunc(sc.cliCtx)
-}
-func (sc *srvCommand) Stop(service.Service) error {
-	return sc.stopFunc(sc.cliCtx)
+	return sc, nil
 }
 
 // TODO: status command
@@ -134,10 +133,75 @@ type srvCommand struct {
 	restart     *cli.Command
 	run         *cli.Command
 	cliCtx      *cli.Context
-	startFunc   cli.ActionFunc
-	stopFunc    cli.ActionFunc
+	runnerFunc  cli.ActionFunc
+	stopFunc    func()
+	exeCount    uint
+	execMax     uint
+	exit        chan uint8
 	cfg         interface{}
 	cfgFilePath string
+}
+
+func (sc *srvCommand) SetExecMax(c uint) {
+	sc.execMax = c
+}
+
+func (sc *srvCommand) SetStopFunc(fc func()) {
+	sc.stopFunc = fc
+}
+
+// 这个被service 包的Run调用, 是服务开始执行的地方
+func (sc *srvCommand) Start(service.Service) error {
+	go sc.running()
+	return nil
+}
+
+func (sc *srvCommand) running() {
+	exit := make(chan uint8, 1)
+	sc.exit = exit
+	exit <- 1
+	for {
+		select {
+		case n := <-exit:
+			if n > 0 {
+				go func() {
+					defer func() {
+						exit <- 1
+						if e := recover(); e != nil {
+							log.Error().Err(nil).Msgf("%v", e)
+						}
+					}()
+					if sc.execMax > 0 && sc.execMax == sc.exeCount {
+						err := sc.Stop(sc.srv)
+						if err != nil {
+							log.Warn().Msg(err.Error())
+						}
+						return
+					}
+					delta := time.Millisecond * time.Duration(math.Pow(2, float64(sc.exeCount)))
+					sc.exeCount++
+					time.Sleep(delta)
+					err := sc.runnerFunc(sc.cliCtx)
+					if err != nil {
+						log.Warn().Msg(err.Error())
+					}
+				}()
+			} else {
+				return
+			}
+		}
+	}
+}
+
+func (sc *srvCommand) Stop(service.Service) error {
+	close(sc.exit)
+	if sc.stopFunc != nil {
+		sc.stopFunc()
+	}
+	if service.Interactive() {
+		os.Exit(0)
+	}
+	return nil
 }
 
 func (sc *srvCommand) init() {
@@ -266,6 +330,7 @@ func installCli(srcPath, bin string) (string, error) {
 	}
 	if !utils.IsWindows() {
 		if _, err := utils.CopyFile(filepath.Join(srcPath, bin), "/usr/bin/"+bin); err != nil {
+			log.Warn().Msg("move to /usr/bin/ failed: " + err.Error())
 			if _, err := utils.CopyFile(filepath.Join(srcPath, bin), "/usr/local/bin/"+bin); err != nil {
 				return "", err
 			} else {
