@@ -3,7 +3,6 @@ package utils
 import (
 	"bytes"
 	"errors"
-	"github.com/veypi/utils/log"
 	"io"
 	"os"
 	"os/exec"
@@ -15,7 +14,7 @@ import (
 )
 
 const (
-	Version = "v0.2.0"
+	Version = "v0.2.1"
 )
 
 func CallPath(s int) string {
@@ -49,7 +48,21 @@ func PathExists(path string) (bool, error) {
 	return false, err
 }
 
+func Abs(path string) (string, error) {
+	if len(path) == 0 || path[0] != '~' {
+		return path, nil
+	}
+	usr, err := user.Current()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Abs(filepath.Join(usr.HomeDir, path[1:]))
+}
+
 func MkFile(dest string) (*os.File, error) {
+	if temp, err := Abs(dest); err == nil {
+		dest = temp
+	}
 	//分割path目录
 	destSplitPathDirs := strings.Split(dest, string(filepath.Separator))
 	//检测时候存在目录
@@ -57,13 +70,9 @@ func MkFile(dest string) (*os.File, error) {
 	for _, dir := range destSplitPathDirs[:len(destSplitPathDirs)-1] {
 		destSplitPath = destSplitPath + dir + string(filepath.Separator)
 		b, _ := PathExists(destSplitPath)
-		if b == false {
-			log.Debug().Msgf("mkdir: %s", destSplitPath)
+		if !b {
 			//创建目录
-			err := os.Mkdir(destSplitPath, 0644)
-			if err != nil {
-				log.Warn().Msg(err.Error())
-			}
+			_ = os.Mkdir(destSplitPath, 0755)
 		}
 	}
 	// 覆写模式
@@ -111,7 +120,6 @@ func Exec(acts ...string) (string, error) {
 	if len(acts) == 0 {
 		return "", nil
 	}
-	log.Debug().Msg("exec: " + strings.Join(acts, " "))
 
 	//First argv must be executable,second must be argv,no space in it
 	cmd := exec.Command(acts[0], acts[1:]...)

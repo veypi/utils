@@ -93,6 +93,7 @@ func SetLogger(l *zerolog.Logger) {
 
 // FileLogger for product, height performance
 func FileLogger(fileName string) *zerolog.Logger {
+	// 会创建644权限文件夹，导致其他用户无法读取
 	fileHook.Filename = fileName
 	l := zerolog.New(&fileHook).With().Caller().Timestamp().Logger()
 	return &l

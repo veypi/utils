@@ -24,19 +24,32 @@ type Service interface {
 	SetExecMax(uint)
 	// 设置服务停止触发函数
 	SetStopFunc(func())
+
+	Run()
 }
 
-func NewCli(app *cli.App, cfgArgs ...interface{}) error {
-	if app == nil || app.Name == "" {
+func NewCli(appName string, cfgArgs ...interface{}) *cli.App {
+	if appName == "" {
 		panic("invalid app")
 	}
-	c := new(cliCommand)
-	c.Name = app.Name
-	c.Install = &cli.Command{
+	app := cli.NewApp()
+	var cfgFilePath = ""
+	if len(cfgArgs) > 1 {
+		cfgFilePath = cfgArgs[1].(string)
+		if len(app.Flags) == 0 {
+			app.Flags = make([]cli.Flag, 0, 10)
+		}
+	}
+	app.Flags = []cli.Flag{&cli.StringFlag{
+		Name:    "cfg",
+		Aliases: []string{"c"},
+		Value:   cfgFilePath,
+	}}
+	install := &cli.Command{
 		Name:  "install",
 		Usage: "install cli and write cli args to cfg file",
 		Action: func(_ *cli.Context) error {
-			p, err := installCli(utils.GetRunnerPath(), app.Name)
+			p, err := installCli(app.Name)
 			if err != nil {
 				return err
 			}
@@ -44,7 +57,7 @@ func NewCli(app *cli.App, cfgArgs ...interface{}) error {
 			if len(cfgArgs) == 0 {
 				return nil
 			}
-			path := utils.PathJoin(GetSrvPath(c.Name), c.Name+".yml")
+			path := GetCfgPath(app.Name, app.Name)
 			if len(cfgArgs) > 1 && cfgArgs[1].(string) != "" {
 				path = cfgArgs[1].(string)
 			}
@@ -52,11 +65,11 @@ func NewCli(app *cli.App, cfgArgs ...interface{}) error {
 			if err != nil {
 				return err
 			}
-			log.Info().Msgf("write %s.yml to %s", c.Name, path)
+			log.Info().Msgf("write %s.yml to %s", app.Name, path)
 			return nil
 		},
 	}
-	c.UnInstall = &cli.Command{
+	unInstall := &cli.Command{
 		Name:  "uninstall",
 		Usage: "remove cli",
 		Action: func(c *cli.Context) error {
@@ -68,17 +81,14 @@ func NewCli(app *cli.App, cfgArgs ...interface{}) error {
 			return nil
 		},
 	}
-	if len(app.Commands) == 0 {
-		app.Commands = make([]*cli.Command, 0, 10)
-	}
-	app.Commands = append(app.Commands, c.Install, c.UnInstall)
+	app.Commands = []*cli.Command{install, unInstall}
 	app.ExitErrHandler = func(c *cli.Context, err error) {
 		HandleExitCoder(err)
 	}
 	app.CommandNotFound = func(c *cli.Context, s string) {
 		log.Warn().Msgf("%s command not found", s)
 	}
-	return nil
+	return app
 }
 
 // 与 urfave/cli 配合使用
@@ -93,12 +103,21 @@ func NewSrv(app *cli.App, runnerFunc cli.ActionFunc, cfgArgs ...interface{}) (Se
 	sc := &srvCommand{
 		name:       app.Name,
 		runnerFunc: runnerFunc,
+		app:        app,
 	}
 	if len(cfgArgs) > 0 {
 		sc.cfg = cfgArgs[0]
 	}
 	if len(cfgArgs) > 1 {
 		sc.cfgFilePath = cfgArgs[1].(string)
+		if len(app.Flags) == 0 {
+			app.Flags = make([]cli.Flag, 0, 10)
+		}
+		app.Flags = append(app.Flags, &cli.StringFlag{
+			Name:    "cfg",
+			Aliases: []string{"c"},
+			Value:   sc.cfgFilePath,
+		})
 	}
 	svcConfig := &service.Config{Name: sc.name}
 	srv, err := service.New(sc, svcConfig)
@@ -124,6 +143,7 @@ func NewSrv(app *cli.App, runnerFunc cli.ActionFunc, cfgArgs ...interface{}) (Se
 
 // TODO: status command
 type srvCommand struct {
+	app         *cli.App
 	srv         service.Service
 	name        string
 	install     *cli.Command
@@ -140,6 +160,13 @@ type srvCommand struct {
 	exit        chan uint8
 	cfg         interface{}
 	cfgFilePath string
+}
+
+func (sc *srvCommand) Run() {
+	err := sc.app.Run(os.Args)
+	if err != nil {
+		log.Warn().Msg(err.Error())
+	}
 }
 
 func (sc *srvCommand) SetExecMax(c uint) {
@@ -209,12 +236,26 @@ func (sc *srvCommand) init() {
 		Name:  "install",
 		Usage: "install service and write cli args to config file",
 		Action: func(c *cli.Context) error {
-			p, err := installCli(utils.GetRunnerPath(), sc.name)
+			p, err := installCli(sc.name)
 			if err != nil {
 				return err
 			}
 			log.Info().Msgf("install %s to %s", sc.name, p)
+			if sc.cfg != nil {
+				path := utils.PathJoin(GetSrvPath(sc.name), sc.name+".yml")
+				if sc.cfgFilePath != "" {
+					path = sc.cfgFilePath
+				}
+				err = DumpCfg(path, sc.cfg)
+				if err != nil {
+					return err
+				}
+				log.Info().Msgf("write %s.yml to %s", sc.name, path)
+			}
 			svcConfig := &service.Config{Name: sc.name, Executable: p}
+			if sc.cfgFilePath != "" {
+				svcConfig.Arguments = []string{"-c", sc.cfgFilePath}
+			}
 			srv, err := service.New(sc, svcConfig)
 			if err != nil {
 				return err
@@ -225,18 +266,6 @@ func (sc *srvCommand) init() {
 			if err != nil {
 				return err
 			}
-			if sc.cfg == nil {
-				return nil
-			}
-			path := utils.PathJoin(GetSrvPath(sc.name), sc.name+".yml")
-			if sc.cfgFilePath != "" {
-				path = sc.cfgFilePath
-			}
-			err = DumpCfg(path, sc.cfg)
-			if err != nil {
-				return err
-			}
-			log.Info().Msgf("write %s.yml to %s", sc.name, path)
 			return nil
 		},
 	}
@@ -295,20 +324,39 @@ func (sc *srvCommand) Srv() service.Service {
 	return sc.srv
 }
 
-type cliCommand struct {
-	Name      string
-	Install   *cli.Command
-	UnInstall *cli.Command
-}
-
 func GetSrvPath(name string) string {
 	var path string
 	if utils.IsWindows() {
-		path = `C:\Program Files\` + name
+		path = `.\` + name
 	} else {
 		path = "/etc/" + name
 	}
 	return path
+}
+
+func GetCfgPath(item1, item2 string) string {
+	name := ""
+	for i, v := range os.Args {
+		if v == "-c" || v == "--cfg" {
+			if i < len(os.Args)-1 {
+				name = os.Args[i+1]
+				break
+			}
+		} else if strings.HasPrefix(v, "-c=") || strings.HasPrefix(v, "--cfg=") {
+			name = strings.SplitN(v, "=", 2)[1]
+			break
+		}
+	}
+	if name != "" {
+		s, err := utils.Abs(name)
+		if err != nil {
+			log.Warn().Msgf("parse cfg file path error: %s", err.Error())
+		} else {
+			return s
+		}
+
+	}
+	return utils.PathJoin(GetSrvPath(item1), item2+".yml")
 }
 
 func GetLocalCfg(name string) string {
@@ -320,7 +368,7 @@ func GetLocalCfg(name string) string {
 	return utils.PathJoin(home, ".config", name)
 }
 
-func installCli(srcPath, bin string) (string, error) {
+func installCli(bin string) (string, error) {
 	binPath, err := os.Executable()
 	if err != nil {
 		binPath, _ = filepath.Abs(os.Args[0])
@@ -329,9 +377,8 @@ func installCli(srcPath, bin string) (string, error) {
 		return binPath, nil
 	}
 	if !utils.IsWindows() {
-		if _, err := utils.CopyFile(filepath.Join(srcPath, bin), "/usr/bin/"+bin); err != nil {
-			log.Warn().Msg("move to /usr/bin/ failed: " + err.Error())
-			if _, err := utils.CopyFile(filepath.Join(srcPath, bin), "/usr/local/bin/"+bin); err != nil {
+		if _, err := utils.CopyFile(binPath, "/usr/bin/"+bin); err != nil {
+			if _, err := utils.CopyFile(binPath, "/usr/local/bin/"+bin); err != nil {
 				return "", err
 			} else {
 				binPath = "/usr/local/bin/" + bin
@@ -389,12 +436,16 @@ func HandleExitCoder(err error) {
 	os.Exit(1)
 }
 
-func LoadCfg(path string, cfg interface{}) error {
+func LoadCfg(path string, cfg interface{}) {
 	yamlFile, err := ioutil.ReadFile(path)
-	if err != nil {
-		return err
+	if err != nil && !os.IsNotExist(err) {
+		log.Warn().Msg(err.Error())
+		return
 	}
-	return yaml.Unmarshal(yamlFile, cfg)
+	err = yaml.Unmarshal(yamlFile, cfg)
+	if err != nil {
+		log.Warn().Msg(err.Error())
+	}
 }
 
 // 会覆盖写入
