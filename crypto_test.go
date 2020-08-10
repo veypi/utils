@@ -45,6 +45,14 @@ func TestGetRsaKey(t *testing.T) {
 			log.Error().Err(nil).Msgf("%v", e)
 		}
 	}()
+	base := "pZUTCEBr4FhPb/7OemgBWkcBWsTMSELRFzvKAW6FDMcozQcQwo9yI2Sq2S//90vTkahPQKBWRYM1zvTnEIJy28oS1nNUJiykOA0U7Ozbue8fHbi8QeyegtvkVlMNch39TcDRh9NFI72LZE8FJCvYt5WhPmIFuqscjw0H0oI1DmY="
+	s, err := FromBase64(base)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	log.Warn().Msg(string(s))
+
 	msg := "msg 123 111@#-()'\"         "
 	pub, pri, err := GetRsaKey(1024)
 	panicErr(err)

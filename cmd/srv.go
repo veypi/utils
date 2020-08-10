@@ -206,6 +206,9 @@ func (sc *srvCommand) running() {
 						return
 					}
 					delta := time.Millisecond * time.Duration(math.Pow(2, float64(sc.exeCount)))
+					if delta > time.Minute {
+						delta = time.Minute
+					}
 					sc.exeCount++
 					time.Sleep(delta)
 					err := sc.runnerFunc(sc.cliCtx)

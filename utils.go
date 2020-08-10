@@ -178,3 +178,27 @@ func homeWindows() (string, error) {
 
 	return home, nil
 }
+
+// InList 判断列表是否含有某元素
+func InList(str string, list []string) bool {
+	for _, temp := range list {
+		if str == temp {
+			return true
+		}
+	}
+	return false
+}
+
+// RemoveRep 通过map主键唯一的特性过滤重复元素
+func RemoveRep(slc []string) []string {
+	result := []string{}
+	tempMap := map[string]byte{} // 存放不重复主键
+	for _, e := range slc {
+		l := len(tempMap)
+		tempMap[e] = 0
+		if len(tempMap) != l { // 加入map后，map长度变化，则元素不重复
+			result = append(result, e)
+		}
+	}
+	return result
+}
