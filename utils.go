@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	Version = "v0.2.1"
+	Version = "v0.2.2"
 )
 
 func CallPath(s int) string {
