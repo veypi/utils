@@ -52,7 +52,11 @@ type PayloadInterface interface {
 	IsExpired() bool
 }
 
-func GetToken(payload PayloadInterface, key []byte) (string, error) {
+// 多级签名 默认至少签名一次
+func GetToken(payload PayloadInterface, keys ...[]byte) (string, error) {
+	if len(keys) == 0 || len(keys[0]) == 0 {
+		return "", errors.New("invalid key")
+	}
 	header := map[string]string{
 		"typ": "JWT",
 		"alg": "HS256",
@@ -71,16 +75,22 @@ func GetToken(payload PayloadInterface, key []byte) (string, error) {
 	}
 	A := base64.StdEncoding.EncodeToString(a)
 	B := base64.StdEncoding.EncodeToString(b)
-	hmacCipher := hmac.New(sha256.New, key)
-	hmacCipher.Write([]byte(A + "." + B))
-	C := hmacCipher.Sum(nil)
-	return A + "." + B + "." + base64.StdEncoding.EncodeToString(C), nil
+	S := A + "." + B
+	for _, k := range keys {
+		hmacCipher := hmac.New(sha256.New, k)
+		hmacCipher.Write([]byte(A + "." + B))
+		C := hmacCipher.Sum(nil)
+		S = S + "." + base64.StdEncoding.EncodeToString(C)
+	}
+	return S, nil
 }
 
-func ParseToken(token string, payload PayloadInterface, key []byte) (bool, error) {
-	var A, B, C string
-	if seqs := strings.Split(token, "."); len(seqs) == 3 {
-		A, B, C = seqs[0], seqs[1], seqs[2]
+// 层级key校验 通过一次校验即可
+func ParseToken(token string, payload PayloadInterface, keys ...[]byte) (bool, error) {
+	var A, B string
+	seqs := strings.Split(token, ".")
+	if len(seqs) == 3 {
+		A, B = seqs[0], seqs[1]
 	} else {
 		return false, InvalidToken
 	}
@@ -91,14 +101,19 @@ func ParseToken(token string, payload PayloadInterface, key []byte) (bool, error
 	if err := json.Unmarshal(tempPayload, payload); err != nil {
 		return false, err
 	}
-	hmacCipher := hmac.New(sha256.New, key)
-	hmacCipher.Write([]byte(A + "." + B))
-	tempC := hmacCipher.Sum(nil)
-	if !hmac.Equal([]byte(C), []byte(base64.StdEncoding.EncodeToString(tempC))) {
-		return false, nil
-	}
 	if payload.IsExpired() {
 		return false, ExpiredToken
 	}
-	return true, nil
+	for index, k := range keys {
+		if len(k) == 0 {
+			continue
+		}
+		hmacCipher := hmac.New(sha256.New, k)
+		hmacCipher.Write([]byte(A + "." + B))
+		tempC := hmacCipher.Sum(nil)
+		if hmac.Equal([]byte(seqs[index+2]), []byte(base64.StdEncoding.EncodeToString(tempC))) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
