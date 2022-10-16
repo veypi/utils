@@ -332,7 +332,7 @@ func GetSrvPath(name string) string {
 	if utils.IsWindows() {
 		path = `.\` + name
 	} else {
-		path = "/etc/" + name
+		path = "~/.config/" + name
 	}
 	return path
 }
