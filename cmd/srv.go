@@ -6,7 +6,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"github.com/veypi/utils"
 	"github.com/veypi/utils/log"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"math"
 	"os"
