@@ -2,6 +2,8 @@
 
 
 ## update
+
+    - v0.3.5 nocolor on win
     - v0.3.2 jwt协议增加多级key校验
     - v0.3.1 忘记加了啥
     - v0.2.1 添加了rsa加密，完善注册服务 
