@@ -100,7 +100,7 @@ func FileLogger(fileName string) *zerolog.Logger {
 }
 
 func ConsoleLogger() *zerolog.Logger {
-	l := zerolog.New(zerolog.NewConsoleWriter(func(w *zerolog.ConsoleWriter) {
+	cl := zerolog.NewConsoleWriter(func(w *zerolog.ConsoleWriter) {
 		w.FormatFieldValue = func(i interface{}) string {
 			switch i := i.(type) {
 			case string:
@@ -113,7 +113,11 @@ func ConsoleLogger() *zerolog.Logger {
 				return fmt.Sprintf("%s", i)
 			}
 		}
-	}))
+	})
+	if runtime.GOOS == "windows" {
+		cl.NoColor = true
+	}
+	l := zerolog.New(cl)
 	return &l
 }
 
