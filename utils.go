@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	Version = "v0.3.6"
+	Version = "v0.3.7"
 )
 
 func CallPath(s int) string {
@@ -201,4 +201,10 @@ func RemoveRep(slc []string) []string {
 		}
 	}
 	return result
+}
+
+func Assert(guard bool, text string) {
+	if !guard {
+		panic(text)
+	}
 }
