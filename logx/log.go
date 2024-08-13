@@ -1,4 +1,4 @@
-package log
+package logx
 
 // 封装自 zero log
 
@@ -215,4 +215,44 @@ func PanicTrace() []byte {
 		}
 	}
 	return buf[:n]
+}
+
+func Assert(guard bool, text string) {
+	if !guard {
+		if enableCaller {
+			_, f, line, _ := runtime.Caller(1)
+			panic(fmt.Sprintf("%s:%d %v", f, line, text))
+		} else {
+			panic(text)
+		}
+	}
+}
+
+func AssertError(e error, text ...string) {
+	if e != nil {
+		if enableCaller {
+			_, f, line, _ := runtime.Caller(1)
+			if len(text) == 0 {
+				panic(fmt.Sprintf("%s:%d %v", f, line, e))
+			}
+			panic(fmt.Sprintf("%s:%d %v:%s", f, line, e, text[0]))
+		} else {
+			if len(text) == 0 {
+				panic(fmt.Sprintf("%v", e))
+			}
+			panic(fmt.Sprintf("%v:%s", e, text[0]))
+		}
+	}
+}
+
+func AssertFuncErr[T any](res T, e error) T {
+	if e != nil {
+		if enableCaller {
+			_, f, line, _ := runtime.Caller(1)
+			panic(fmt.Sprintf("%s:%d %v", f, line, e))
+		} else {
+			panic(e.Error())
+		}
+	}
+	return res
 }

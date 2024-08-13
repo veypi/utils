@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	Version = "v0.3.7"
+	Version = "v0.4.0"
 )
 
 func CallPath(s int) string {
@@ -46,6 +46,14 @@ func PathExists(path string) (bool, error) {
 		return false, nil
 	}
 	return false, err
+}
+
+func PathIsDir(p string) bool {
+	s, err := os.Stat(p)
+	if err != nil {
+		return false
+	}
+	return s.IsDir()
 }
 
 func Abs(path string) (string, error) {
@@ -201,10 +209,4 @@ func RemoveRep(slc []string) []string {
 		}
 	}
 	return result
-}
-
-func Assert(guard bool, text string) {
-	if !guard {
-		panic(text)
-	}
 }

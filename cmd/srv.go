@@ -5,7 +5,7 @@ import (
 	"github.com/kardianos/service"
 	"github.com/urfave/cli/v2"
 	"github.com/veypi/utils"
-	"github.com/veypi/utils/log"
+	"github.com/veypi/utils/logx"
 	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"math"
@@ -53,7 +53,7 @@ func NewCli(appName string, cfgArgs ...interface{}) *cli.App {
 			if err != nil {
 				return err
 			}
-			log.Info().Msgf("install %s to %s", app.Name, p)
+			logx.Info().Msgf("install %s to %s", app.Name, p)
 			if len(cfgArgs) == 0 {
 				return nil
 			}
@@ -65,7 +65,7 @@ func NewCli(appName string, cfgArgs ...interface{}) *cli.App {
 			if err != nil {
 				return err
 			}
-			log.Info().Msgf("write %s.yml to %s", app.Name, path)
+			logx.Info().Msgf("write %s.yml to %s", app.Name, path)
 			return nil
 		},
 	}
@@ -77,7 +77,7 @@ func NewCli(appName string, cfgArgs ...interface{}) *cli.App {
 			if err != nil {
 				return err
 			}
-			log.Info().Msg("uninstall " + p)
+			logx.Info().Msg("uninstall " + p)
 			return nil
 		},
 	}
@@ -86,7 +86,7 @@ func NewCli(appName string, cfgArgs ...interface{}) *cli.App {
 		HandleExitCoder(err)
 	}
 	app.CommandNotFound = func(c *cli.Context, s string) {
-		log.Warn().Msgf("%s command not found", s)
+		logx.Warn().Msgf("%s command not found", s)
 	}
 	return app
 }
@@ -136,7 +136,7 @@ func NewSrv(app *cli.App, runnerFunc cli.ActionFunc, cfgArgs ...interface{}) (Se
 		HandleExitCoder(err)
 	}
 	app.CommandNotFound = func(c *cli.Context, s string) {
-		log.Warn().Msgf("%s command not found", s)
+		logx.Warn().Msgf("%s command not found", s)
 	}
 	return sc, nil
 }
@@ -165,7 +165,7 @@ type srvCommand struct {
 func (sc *srvCommand) Run() {
 	err := sc.app.Run(os.Args)
 	if err != nil {
-		log.Warn().Msg(err.Error())
+		logx.Warn().Msg(err.Error())
 	}
 }
 
@@ -195,13 +195,13 @@ func (sc *srvCommand) running() {
 					defer func() {
 						exit <- 1
 						if e := recover(); e != nil {
-							log.Error().Err(nil).Msgf("%v", e)
+							logx.Error().Err(nil).Msgf("%v", e)
 						}
 					}()
 					if sc.execMax > 0 && sc.execMax == sc.exeCount {
 						err := sc.Stop(sc.srv)
 						if err != nil {
-							log.Warn().Msg(err.Error())
+							logx.Warn().Msg(err.Error())
 						}
 						return
 					}
@@ -213,7 +213,7 @@ func (sc *srvCommand) running() {
 					time.Sleep(delta)
 					err := sc.runnerFunc(sc.cliCtx)
 					if err != nil {
-						log.Warn().Msg(err.Error())
+						logx.Warn().Msg(err.Error())
 					}
 				}()
 			} else {
@@ -243,7 +243,7 @@ func (sc *srvCommand) init() {
 			if err != nil {
 				return err
 			}
-			log.Info().Msgf("install %s to %s", sc.name, p)
+			logx.Info().Msgf("install %s to %s", sc.name, p)
 			if sc.cfg != nil {
 				path := utils.PathJoin(GetSrvPath(sc.name), sc.name+".yml")
 				if sc.cfgFilePath != "" {
@@ -253,7 +253,7 @@ func (sc *srvCommand) init() {
 				if err != nil {
 					return err
 				}
-				log.Info().Msgf("write %s.yml to %s", sc.name, path)
+				logx.Info().Msgf("write %s.yml to %s", sc.name, path)
 			}
 			svcConfig := &service.Config{Name: sc.name, Executable: p}
 			if sc.cfgFilePath != "" {
@@ -287,7 +287,7 @@ func (sc *srvCommand) init() {
 			if err != nil {
 				return err
 			}
-			log.Info().Msg("uninstall " + p)
+			logx.Info().Msg("uninstall " + p)
 			return nil
 		},
 	}
@@ -353,7 +353,7 @@ func GetCfgPath(item1, item2 string) string {
 	if name != "" {
 		s, err := utils.Abs(name)
 		if err != nil {
-			log.Warn().Msgf("parse cfg file path error: %s", err.Error())
+			logx.Warn().Msgf("parse cfg file path error: %s", err.Error())
 		} else {
 			return s
 		}
@@ -365,7 +365,7 @@ func GetCfgPath(item1, item2 string) string {
 func GetLocalCfg(name string) string {
 	home, err := utils.Home()
 	if err != nil {
-		log.Warn().Msg(err.Error())
+		logx.Warn().Msg(err.Error())
 		home = utils.GetRunnerPath()
 	}
 	return utils.PathJoin(home, ".config", name)
@@ -430,7 +430,7 @@ func HandleExitCoder(err error) {
 		return
 	}
 	if err != nil {
-		log.Warn().Err(err).Msg("exit")
+		logx.Warn().Err(err).Msg("exit")
 	}
 	if exitErr, ok := err.(ExitCoder); ok {
 		os.Exit(exitErr.ExitCode())
@@ -442,12 +442,12 @@ func HandleExitCoder(err error) {
 func LoadCfg(path string, cfg interface{}) {
 	yamlFile, err := ioutil.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {
-		log.Warn().Msg(err.Error())
+		logx.Warn().Msg(err.Error())
 		return
 	}
 	err = yaml.Unmarshal(yamlFile, cfg)
 	if err != nil {
-		log.Warn().Msg(err.Error())
+		logx.Warn().Msg(err.Error())
 	}
 }
 
