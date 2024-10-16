@@ -1,4 +1,4 @@
-package logx
+package logv
 
 // 封装自 zero log
 
@@ -217,6 +217,16 @@ func PanicTrace() []byte {
 	return buf[:n]
 }
 
+func RecoverErr() error {
+	if e := recover(); e != nil {
+		if e, ok := e.(error); ok {
+			return e
+		}
+		return fmt.Errorf("%w", e)
+	}
+	return nil
+}
+
 func Assert(guard bool, text string) {
 	if !guard {
 		if enableCaller {
@@ -233,14 +243,14 @@ func AssertError(e error, text ...string) {
 		if enableCaller {
 			_, f, line, _ := runtime.Caller(1)
 			if len(text) == 0 {
-				panic(fmt.Sprintf("%s:%d %v", f, line, e))
+				panic(fmt.Errorf("%s:%d %w", f, line, e))
 			}
-			panic(fmt.Sprintf("%s:%d %v:%s", f, line, e, text[0]))
+			panic(fmt.Errorf("%s:%d %w:%s", f, line, e, text[0]))
 		} else {
 			if len(text) == 0 {
-				panic(fmt.Sprintf("%v", e))
+				panic(e)
 			}
-			panic(fmt.Sprintf("%v:%s", e, text[0]))
+			panic(fmt.Errorf("%w:%s", e, text[0]))
 		}
 	}
 }
@@ -249,9 +259,9 @@ func AssertFuncErr[T any](res T, e error) T {
 	if e != nil {
 		if enableCaller {
 			_, f, line, _ := runtime.Caller(1)
-			panic(fmt.Sprintf("%s:%d %v", f, line, e))
+			panic(fmt.Errorf("%s:%d %w", f, line, e))
 		} else {
-			panic(e.Error())
+			panic(e)
 		}
 	}
 	return res

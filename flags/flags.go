@@ -11,9 +11,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime/debug"
 
 	"github.com/veypi/utils"
-	"github.com/veypi/utils/logx"
+	"github.com/veypi/utils/logv"
 	"gopkg.in/yaml.v3"
 )
 
@@ -32,13 +33,34 @@ type Flags struct {
 	subs    []*Flags
 	parent  *Flags
 	help    string
+	runFunc func() error
 	Command func() error
 	Before  func() error
 	After   func(error) error
 }
 
-func (f *Flags) Parse() error {
-	return f.parse(os.Args[1:])
+func (f *Flags) Run() (err error) {
+	if f.parent != nil {
+		return f.parent.Run()
+	}
+	if f.runFunc == nil {
+		return fmt.Errorf("you need call Parse() first")
+	}
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("%v:\n%s", e, debug.Stack())
+		}
+	}()
+	err = f.runFunc()
+	return err
+}
+
+func (f *Flags) Parse() {
+	err := f.parse(os.Args[1:])
+	if err != nil {
+		logv.WithNoCaller.Error().Msg(err.Error())
+		os.Exit(0)
+	}
 }
 
 func (f *Flags) str() string {
@@ -76,6 +98,14 @@ func (f *Flags) fire_after_func(e error) error {
 	return e
 }
 
+func (f *Flags) set_run_func(fc func() error) {
+	if f.parent != nil {
+		f.parent.set_run_func(fc)
+	} else {
+		f.runFunc = fc
+	}
+}
+
 func (f *Flags) parse(arguments []string) (err error) {
 	f.FlagSet.Usage = f.Usage
 	err = f.FlagSet.Parse(arguments)
@@ -90,22 +120,20 @@ func (f *Flags) parse(arguments []string) (err error) {
 		}
 	}
 	if f.Command != nil {
-		if f.NArg() != 0 {
-			return fmt.Errorf("unexpected argument: %s", f.Arg(0))
-		}
-		defer func() {
-			if e := recover(); e != nil {
-				err = fmt.Errorf("%v", e)
+		f.set_run_func(func() error {
+			if f.NArg() != 0 {
+				return fmt.Errorf("unexpected argument: %s", f.Arg(0))
 			}
-		}()
-		err = f.fire_before_func()
-		if err != nil {
-			return
-		}
-		err = f.Command()
-		return f.fire_after_func(err)
+			err := f.fire_before_func()
+			if err != nil {
+				return err
+			}
+			err = f.Command()
+			return f.fire_after_func(err)
+		})
 	} else {
 		f.Usage()
+		os.Exit(0)
 	}
 	return
 }
@@ -148,12 +176,12 @@ func (f *Flags) SubCommand(name, des string) *Flags {
 func LoadCfg(path string, cfg interface{}) {
 	yamlFile, err := os.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {
-		logx.Warn().Msg(err.Error())
+		logv.Warn().Msg(err.Error())
 		return
 	}
 	err = yaml.Unmarshal(yamlFile, cfg)
 	if err != nil {
-		logx.Warn().Msg(err.Error())
+		logv.Warn().Msg(err.Error())
 	}
 }
 

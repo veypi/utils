@@ -8,9 +8,10 @@ package utils
 //
 
 import (
-	"fmt"
-	"github.com/veypi/utils/logx"
+	"encoding/hex"
 	"testing"
+
+	"github.com/veypi/utils/logv"
 )
 
 func panicErr(err error) {
@@ -20,38 +21,38 @@ func panicErr(err error) {
 }
 
 func TestAes(t *testing.T) {
-	text := RandSeq(32)
-	fmt.Println(len(text))
-	key := []byte("123456")
-	xText, err := AesEncrypt(text, key)
+	// text := RandSeq(32)
+	text := "9a57abf6444d45b7ab1bd5d357d90e86"
+	key, _ := hex.DecodeString("dcaece4ab04454cdf20208d9ff537aea16d140ac3ae57edc865582d707306b41")
+	iv, _ := hex.DecodeString("c611c0b0bb274e6d9577777f37420240")
+	xText, err := AesEncrypt([]byte(text), key[:32], iv)
 	if err != nil {
 		t.Errorf(err.Error())
 	}
-	nText, err := AesDecrypt(xText, key)
+	nText, err := AesDecrypt([]byte("SNF3gMXzrVLEwyI1O97GUbFjJ5AW05lL7xdsP3OWq1dk4QA2yrtIEYKas0sTppQ3"), key[:32], iv)
 	if err != nil {
 		t.Errorf(err.Error())
 	}
 	if text != nText {
 		t.Errorf("aes is not right.")
 	} else {
-		t.Logf("\ntext(%d) %s;\nxtext(%d) %s;\nntext(%d) %s;\nkey(%d) %s",
-			len(text), text, len(xText), xText, len(nText), nText, len(key), key)
+		t.Logf("\ntext(%d) %s;\nxtext(%d) %s;\nntext(%d) %s;\nkey(%d) %v \niv(%d) %v",
+			len(text), text, len(xText), xText, len(nText), nText, len(key), key, len(iv), iv)
 	}
 }
 
 func TestGetRsaKey(t *testing.T) {
 	defer func() {
 		if e := recover(); e != nil {
-			logx.Error().Err(nil).Msgf("%v", e)
+			logv.Error().Err(nil).Msgf("%v", e)
 		}
 	}()
 	base := "pZUTCEBr4FhPb/7OemgBWkcBWsTMSELRFzvKAW6FDMcozQcQwo9yI2Sq2S//90vTkahPQKBWRYM1zvTnEIJy28oS1nNUJiykOA0U7Ozbue8fHbi8QeyegtvkVlMNch39TcDRh9NFI72LZE8FJCvYt5WhPmIFuqscjw0H0oI1DmY="
-	s, err := FromBase64(base)
+	_, err := FromBase64(base)
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	logx.Warn().Msg(string(s))
 
 	msg := "msg 123 111@#-()'\"         "
 	pub, pri, err := GetRsaKey(1024)

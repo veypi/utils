@@ -1,4 +1,4 @@
-package logx
+package logv
 
 import (
 	"github.com/rs/zerolog"

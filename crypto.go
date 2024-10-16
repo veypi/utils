@@ -21,62 +21,60 @@ import (
 	"errors"
 )
 
-// PKCS5Padding  密文填充
-func PKCS5Padding(text []byte, blockSize int) []byte {
-	padding := blockSize - len(text)%blockSize
-	paddingSuffix := bytes.Repeat([]byte{byte(padding)}, padding)
-	return append(text, paddingSuffix...)
+// PKCS7Padding 添加 PKCS#7 填充
+func PKCS7Padding(ciphertext []byte, blockSize int) []byte {
+	padding := blockSize - len(ciphertext)%blockSize
+	padtext := bytes.Repeat([]byte{byte(padding)}, padding)
+	return append(ciphertext, padtext...)
 }
 
-// PKCS5UnPadding  取消填充
-func PKCS5UnPadding(origData []byte) ([]byte, bool) {
+// PKCS7UnPadding 移除 PKCS#7 填充
+func PKCS7UnPadding(origData []byte) ([]byte, bool) {
 	length := len(origData)
-	padding := int(origData[length-1])
-	if padding >= length {
+	unpadding := int(origData[length-1])
+	if unpadding >= length {
 		return nil, false
 	}
-	return origData[:(length - padding)], true
+	return origData[:(length - unpadding)], true
 }
 
-// AesEncrypt aes 加密
-// key: 16, 24, or 32 bytes to select
-func AesEncrypt(orig string, key []byte) (string, error) {
-	key = PKCS5Padding(key, 32)[:32]
-	origData := []byte(orig)
+// AesEncrypt 使用 AES-256-CBC 进行加密
+// key 256 bit / 32 Byte
+// iv  128 bit / 16 Byte
+func AesEncrypt(plaintext, key, iv []byte) (string, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return "", err
 	}
 
-	blockSize := block.BlockSize() // 16
-	origData = PKCS5Padding(origData, blockSize)
-	blockMode := cipher.NewCBCEncrypter(block, key[:blockSize])
-	encrypted := make([]byte, len(origData))
-	blockMode.CryptBlocks(encrypted, origData)
-	return base64.StdEncoding.EncodeToString(encrypted), nil
+	plaintext = PKCS7Padding(plaintext, block.BlockSize())
+	blockMode := cipher.NewCBCEncrypter(block, iv)
+	crypted := make([]byte, len(plaintext))
+	blockMode.CryptBlocks(crypted, plaintext)
+
+	return base64.StdEncoding.EncodeToString(crypted), nil
 }
 
-// AesDecrypt aes解密
-// key: 16, 24, or 32 bytes to select
-func AesDecrypt(encrypted string, key []byte) (string, error) {
-	key = PKCS5Padding(key, 32)[:32]
-	cryptData, err := base64.StdEncoding.DecodeString(encrypted)
-	if err != nil {
-		return "", err
-	}
+// AesDecrypt 使用 AES-256-CBC 进行解密
+func AesDecrypt(encrypted, key, iv []byte) (string, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return "", err
 	}
 
-	blockSize := block.BlockSize()
-	blockMode := cipher.NewCBCDecrypter(block, key[:blockSize])
-	origData := make([]byte, len(cryptData))
-	blockMode.CryptBlocks(origData, cryptData)
-	if origData, isRight := PKCS5UnPadding(origData); isRight {
-		return string(origData), nil
+	encrypted, err = base64.StdEncoding.DecodeString(string(encrypted))
+	if err != nil {
+		return "", err
 	}
-	return "", errors.New("invalid key")
+
+	blockMode := cipher.NewCBCDecrypter(block, iv)
+	origData := make([]byte, len(encrypted))
+	blockMode.CryptBlocks(origData, encrypted)
+	origData, ok := PKCS7UnPadding(origData)
+	if !ok {
+		return "", errors.New("PKCS7UnPadding error")
+	}
+	return string(origData), nil
 }
 
 // rsa
