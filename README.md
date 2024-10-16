@@ -3,6 +3,7 @@
 
 ## update
 
+    - v0.4.1 slice/flags
     - v0.3.5 nocolor on win
     - v0.3.2 jwt协议增加多级key校验
     - v0.3.1 忘记加了啥
