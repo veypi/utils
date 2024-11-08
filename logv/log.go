@@ -4,10 +4,11 @@ package logv
 
 import (
 	"fmt"
-	"github.com/rs/zerolog"
-	"gopkg.in/natefinch/lumberjack.v2"
 	"runtime"
 	"strconv"
+
+	"github.com/rs/zerolog"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 type Level int8
@@ -114,9 +115,9 @@ func ConsoleLogger() *zerolog.Logger {
 			}
 		}
 	})
-	if runtime.GOOS == "windows" {
-		cl.NoColor = true
-	}
+	// if runtime.GOOS == "windows" {
+	// 	cl.NoColor = true
+	// }
 	l := zerolog.New(cl)
 	return &l
 }
@@ -161,7 +162,7 @@ func Warn() *zerolog.Event {
 //
 // You must call Msg on the returned event in order to send the event.
 func Error() *zerolog.Event {
-	return logger.Error().Stack()
+	return logger.Error()
 }
 
 // Fatal starts a new message with fatal level. The os.Exit(1) function
@@ -169,7 +170,7 @@ func Error() *zerolog.Event {
 //
 // You must call Msg on the returned event in order to send the event.
 func Fatal() *zerolog.Event {
-	return logger.Fatal().Stack()
+	return logger.Fatal()
 }
 
 // Panic starts a new message with panic level. The message is also sent
@@ -222,7 +223,7 @@ func RecoverErr() error {
 		if e, ok := e.(error); ok {
 			return e
 		}
-		return fmt.Errorf("%w", e)
+		return fmt.Errorf("%v", e)
 	}
 	return nil
 }

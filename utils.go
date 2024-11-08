@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	Version = "v0.4.1"
+	Version = "v0.4.2"
 )
 
 func CallPath(s int) string {
@@ -37,7 +37,7 @@ func FileExists(name string) bool {
 	return true
 }
 
-//检测文件夹路径时候存在
+// 检测文件夹路径时候存在
 func PathExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
@@ -88,7 +88,7 @@ func MkFile(dest string) (*os.File, error) {
 	return os.OpenFile(dest, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 }
 
-//生成目录并拷贝文件
+// 生成目录并拷贝文件
 func CopyFile(src, dest string) (w int64, err error) {
 	srcFile, err := os.Open(src)
 	if err != nil {
@@ -104,7 +104,7 @@ func CopyFile(src, dest string) (w int64, err error) {
 	return io.Copy(dstFile, srcFile)
 }
 
-//Get the absolute path to the running directory
+// Get the absolute path to the running directory
 func GetRunnerPath() string {
 	if path, err := filepath.Abs(filepath.Dir(os.Args[0])); err == nil {
 		return path
@@ -112,7 +112,7 @@ func GetRunnerPath() string {
 	return os.Args[0]
 }
 
-//Determine whether the current system is a Windows system?
+// Determine whether the current system is a Windows system?
 func IsWindows() bool {
 	if runtime.GOOS == "windows" {
 		return true
