@@ -32,6 +32,16 @@ func SliceGet[T any](slice []T, fc func(T) bool) *T {
 	return nil
 }
 
+func ForEach[T any](slice []T, fn func(int, T) error) error {
+	for i, s := range slice {
+		err := fn(i, s)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func InsertAt[T any](slice []T, index int, value T) []T {
 	// 检查插入位置是否有效
 	if index > len(slice) || len(slice) == 0 {

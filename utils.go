@@ -208,6 +208,13 @@ func ToLowerFirst(s string) string {
 	firstRune := unicode.ToLower(rune(s[0]))
 	return string(firstRune) + s[1:]
 }
+func ToUpperFirst(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+	firstRune := unicode.ToUpper(rune(s[0]))
+	return string(firstRune) + s[1:]
+}
 
 func SnakeToPrivateCamel(input string) string {
 	parts := strings.Split(input, "_")
@@ -221,6 +228,9 @@ func SnakeToCamel(input string) string {
 	parts := strings.Split(input, "_")
 	for i := 0; i < len(parts); i++ {
 		parts[i] = ToTitle(parts[i])
+		if parts[i] == "Id" {
+			parts[i] = "ID"
+		}
 	}
 	return strings.Join(parts, "")
 }
