@@ -92,6 +92,11 @@ func SetLogger(l *zerolog.Logger) {
 	WithNoCaller = l.With().Timestamp().Logger()
 }
 
+func Caller(depth uint) *zerolog.Logger {
+	l := originLoger.With().Timestamp().CallerWithSkipFrameCount(int(depth) + 2).Logger()
+	return &l
+}
+
 // FileLogger for product, height performance
 func FileLogger(fileName string) *zerolog.Logger {
 	// 会创建644权限文件夹，导致其他用户无法读取
