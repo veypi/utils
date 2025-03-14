@@ -14,46 +14,40 @@ import (
 
 func New[T any]() *Bus[T] {
 	return &Bus[T]{
-		capacity: 10,
-		cache:    make([]*T, 0, 10),
+		fnMap: make(map[int]func(T)),
 	}
 }
 
 type Bus[T any] struct {
 	utils.FastLocker
-	fns      []func(T)
-	cache    []*T
-	capacity int
+	count int
+	fnMap map[int]func(T)
 }
 
 func (b *Bus[T]) On(fn func(T)) func() {
-	b.fns = append(b.fns, fn)
-	idx := len(b.fns) - 1
-	for _, v := range b.cache {
-		fn(*v)
-	}
+	idx := b.count
+	b.count++
+	b.fnMap[idx] = fn
 	return func() {
-		b.fns = append(b.fns[:idx], b.fns[idx+1:]...)
+		delete(b.fnMap, idx)
 	}
 }
 
 func (b *Bus[T]) Emit(data T) {
 	idx := 0
-	if len(b.cache) < b.capacity {
-		b.cache = append(b.cache, &data)
-	} else {
-		b.cache = append(b.cache[1:], &data)
-	}
-	for idx < len(b.fns) {
-		fn := b.fns[idx]
+	for idx < b.count {
+		fn, ok := b.fnMap[idx]
 		idx++
-		go func() {
+		if !ok {
+			continue
+		}
+		func(d T) {
 			defer func() {
 				if err := recover(); err != nil {
 					logv.Warn().Msgf("bus emit error: %v", err)
 				}
-				fn(data)
 			}()
-		}()
+			fn(d)
+		}(data)
 	}
 }
