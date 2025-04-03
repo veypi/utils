@@ -57,19 +57,36 @@ func PathIsDir(p string) bool {
 	return s.IsDir()
 }
 
-func Abs(path string) (string, error) {
-	if len(path) == 0 || path[0] != '~' {
-		return path, nil
+func CurrentDir(depth ...int) string {
+	d := 1
+	if len(depth) > 0 {
+		d = d + int(depth[0])
 	}
-	usr, err := user.Current()
+	dir := CurrentPath(d)
+	if dir == "" {
+		return ""
+	}
+	return filepath.Dir(dir)
+}
+
+func CurrentPath(depth ...int) string {
+	d := 1
+	if len(depth) > 0 {
+		d = d + int(depth[0])
+	}
+	_, filePath, _, ok := runtime.Caller(d)
+	if !ok {
+		return ""
+	}
+	absPath, err := filepath.Abs(filePath)
 	if err != nil {
-		return "", err
+		return ""
 	}
-	return filepath.Abs(filepath.Join(usr.HomeDir, path[1:]))
+	return absPath
 }
 
 func MkFile(dest string) (*os.File, error) {
-	if temp, err := Abs(dest); err == nil {
+	if temp, err := filepath.Abs(dest); err == nil {
 		dest = temp
 	}
 	//分割path目录
