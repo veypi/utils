@@ -194,17 +194,9 @@ func Log() *zerolog.Event {
 	return logger.Log()
 }
 
-// Print sends a log event using debug level and no extra field.
-// Arguments are handled in the manner of fmt.Print.
-func Print(v ...interface{}) {
-	logger.Print(v...)
-}
-
-// Printf sends a log event using debug level and no extra field.
-// Arguments are handled in the manner of fmt.Printf.
-func Printf(format string, v ...interface{}) {
-	logger.Printf(format, v...)
-}
+var Print = WithDeepCaller.Print
+var Println = WithDeepCaller.Print
+var Printf = WithDeepCaller.Printf
 
 func PanicTrace() []byte {
 	buf := make([]byte, 10240)

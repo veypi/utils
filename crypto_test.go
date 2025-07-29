@@ -23,13 +23,17 @@ func panicErr(err error) {
 func TestAes(t *testing.T) {
 	// text := RandSeq(32)
 	text := "9a57abf6444d45b7ab1bd5d357d90e86"
-	key, _ := hex.DecodeString("dcaece4ab04454cdf20208d9ff537aea16d140ac3ae57edc865582d707306b41")
-	iv, _ := hex.DecodeString("c611c0b0bb274e6d9577777f37420240")
+	password := "123acs2vvv"
+	key := PKCS7Padding([]byte(password), 32)
+	nkey, be := PKCS7UnPadding(key)
+	t.Errorf("key: %v %s %v", key, nkey, be)
+	iv := logv.AssertFuncErr(hex.DecodeString("c611c0b0bb274e6d9577777f37420240"))
 	xText, err := AesEncrypt([]byte(text), key[:32], iv)
 	if err != nil {
 		t.Errorf(err.Error())
 	}
-	nText, err := AesDecrypt([]byte("SNF3gMXzrVLEwyI1O97GUbFjJ5AW05lL7xdsP3OWq1dk4QA2yrtIEYKas0sTppQ3"), key[:32], iv)
+	t.Errorf(xText)
+	nText, err := AesDecrypt([]byte("nHD4OGrlJ9dkhmI2rOuiTRIrOXr4x165nrqe7rxvd5BMlvwHWJGrclaCKTnvQW+E"), key[:32], iv)
 	if err != nil {
 		t.Errorf(err.Error())
 	}
